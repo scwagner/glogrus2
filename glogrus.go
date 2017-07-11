@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	"github.com/Sirupsen/logrus"
-	"goji.io"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 // NewGlogrus allows you to configure a goji middleware that logs all requests and responses
 // using the structured logger logrus. It takes the logrus instance and the name of the app
-// as the parameters and returns a middleware of type "func(goji.Handler) goji.Handler"
+// as the parameters and returns a middleware of type "func(http.Handler) http.Handler"
 //
 // Example:
 //
@@ -20,7 +19,7 @@ import (
 //		import(
 //			""goji.io"
 //			"github.com/goji/glogrus2"
-//			"github.com/Sirupsen/logrus"
+//			"github.com/sirupsen/logrus"
 //		)
 //
 //		func main() {
@@ -33,34 +32,34 @@ import (
 //			goji.Serve()
 //		}
 //
-func NewGlogrus(l *logrus.Logger, name string) func(goji.Handler) goji.Handler {
+func NewGlogrus(l *logrus.Logger, name string) func(http.Handler) http.Handler {
 	return NewGlogrusWithReqId(l, name, emptyRequestId)
 }
 
 // NewGlogrusWithReqId allows you to configure a goji middleware that logs all requests and responses
 // using the structured logger logrus. It takes the logrus instance, the name of the app and a function
 // that can retrieve a requestId from the Context "func(context.Context) string"
-// as the parameters and returns a middleware of type "func(goji.Handler) goji.Handler"
-//
-// Passing in the function that returns a requestId allows you to "plug in" other middleware that may set the request id
-//
-// Example:
-//
-//		package main
-//
-//		import(
-//			""goji.io"
-//			"github.com/goji/glogrus2"
-//			"github.com/Sirupsen/logrus"
-//		)
-//
-//		func main() {
-//
-//			logr := logrus.New()
-//			logr.Formatter = new(logrus.JSONFormatter)
-//			goji.Use(glogrus.NewGlogrusWithReqId(logr, "my-app-name", GetRequestId))
-//
-//			goji.Get("/ping", yourHandler)
+	// as the parameters and returns a middleware of type "func(http.Handler) http.Handler"
+	//
+	// Passing in the function that returns a requestId allows you to "plug in" other middleware that may set the request id
+	//
+	// Example:
+	//
+	//		package main
+	//
+	//		import(
+	//			""goji.io"
+	//			"github.com/goji/glogrus2"
+	//			"github.com/sirupsen/logrus"
+	//		)
+	//
+	//		func main() {
+	//
+	//			logr := logrus.New()
+	//			logr.Formatter = new(logrus.JSONFormatter)
+	//			goji.Use(glogrus.NewGlogrusWithReqId(logr, "my-app-name", GetRequestId))
+	//
+	//			goji.Get("/ping", yourHandler)
 //			goji.Serve()
 //		}
 //
@@ -68,12 +67,12 @@ func NewGlogrus(l *logrus.Logger, name string) func(goji.Handler) goji.Handler {
 //			return ctx.Value("requestIdKey")
 //		}
 //
-func NewGlogrusWithReqId(l *logrus.Logger, name string, reqidf func(context.Context) string) func(goji.Handler) goji.Handler {
-	return func(h goji.Handler) goji.Handler {
-		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func NewGlogrusWithReqId(l *logrus.Logger, name string, reqidf func(context.Context) string) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			reqID := reqidf(ctx)
+			reqID := reqidf(r.Context())
 
 			l.WithFields(logrus.Fields{
 				"req_id": reqID,
@@ -83,7 +82,7 @@ func NewGlogrusWithReqId(l *logrus.Logger, name string, reqidf func(context.Cont
 			}).Info("req_start")
 			lresp := wrapWriter(w)
 
-			h.ServeHTTPC(ctx, lresp, r)
+			h.ServeHTTP(lresp, r)
 			lresp.maybeWriteHeader()
 
 			latency := float64(time.Since(start)) / float64(time.Millisecond)
@@ -98,7 +97,7 @@ func NewGlogrusWithReqId(l *logrus.Logger, name string, reqidf func(context.Cont
 				"app":     name,
 			}).Info("req_served")
 		}
-		return goji.HandlerFunc(fn)
+		return http.HandlerFunc(fn)
 	}
 
 }
